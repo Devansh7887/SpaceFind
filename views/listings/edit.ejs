@@ -1,0 +1,58 @@
+<% layout("/layouts/boilerplate") %>
+
+  <body>
+
+    <div class="row offset-2 mt-3">
+      <div class="col-8">
+        <h3>Edit Your Listing</h3>
+        <form method="POST" action="/listings/<%= listing._id %>?_method=PUT" enctype="multipart/form-data">
+
+          <div class="mb-3">
+            <label for="title" class="form-label"><b>Title</b></label>
+            <input name="listing[title]" value="<%= listing.title %>" type="text" class="form-control" />
+          </div>
+
+          <div class="mb-3">
+            <label for="description" class="form-label"><b>Description</b></label>
+            <textarea class="form-control" name="listing[description]">
+              <%= listing.description %></textarea>
+          </div>
+
+          <div class="mb-3">
+            Original Image
+           <img src="<%= originalImageUrl %>"/> 
+          </div>
+
+          <div class="mb-3">
+            <label for="image" class="form-label"><b>Upload New Image</b></label>
+            <input class="form-control" name="listing[image]"  type="file" />
+          </div>
+
+          <div class="row">
+            <div class="mb-3 col-md-4">
+              <label for="price" class="form-label"><b>Price</b></label>
+              <input class="form-control" name="listing[price]" value="<%= listing.price %>" type="number" />
+            </div>
+
+            <div class="mb-3 col-md-8">
+              <label for="country" class="form-label"><b>Country</b></label>
+              <input class="form-control" name="listing[country]" value="<%= listing.country %>" type="text" />
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="location" class="form-label"><b>Location</b></label>
+            <input class="form-control" name="listing[location]" value="<%= listing.location %>" type="text" />
+          </div>
+
+          <br /><br />
+          <button class="btn btn-dark edit-btn mt-3">Edit</button>
+        </form>
+
+        <br /><br /><br />
+
+      </div>
+
+    </div>
+
+  </body>
