@@ -1,9 +1,8 @@
 const { response } = require("express");
 const Listing = require("../models/listing.js");
-const mbxGeocoding = require('@mapbox/mapbox-sdk/services/geocoding');
-const mapToken = process.env.MAP_TOKEN;
 
-const geocodingClient = mbxGeocoding({ accessToken: mapToken });
+// Geoapify API Key
+const geoapifyApiKey = process.env.GEOAPIFY_API_KEY;
 
 module.exports.index = async (req, res) => {
   const allListings = await Listing.find({});
@@ -30,28 +29,70 @@ module.exports.showRoute = async (req, res) => {
 
 module.exports.createRoute = async(req,res,next)=>{
 
-  let response = await geocodingClient.forwardGeocode({
-      query: req.body.listing.location,
-      limit: 1
-    })
-      .send()
-  
+  // Check if file was uploaded successfully
+  if (!req.file) {
+    console.error("File upload failed - no file received");
+    req.flash("error", "Image upload failed. Please check your Cloudinary credentials.");
+    return res.redirect("/listings/new");
+  }
+
+  console.log("File uploaded successfully:", req.file);
 
   let url = req.file.path;
   let filename = req.file.filename;
 
   const newListing = new Listing(req.body.listing);
   newListing.owner = req.user._id;
-  newListing.geometry = response.body.features[0].geometry;
+  
+  // Try geocoding with Geoapify
+  try {
+    const location = encodeURIComponent(req.body.listing.location);
+    const geoapifyUrl = `https://api.geoapify.com/v1/geocode/search?text=${location}&apiKey=${geoapifyApiKey}`;
+    
+    const response = await fetch(geoapifyUrl);
+    const data = await response.json();
+    
+    console.log("Geocoding successful");
+    
+    // Check if geocoding returned valid results
+    if (data.features && data.features.length > 0) {
+      // Geoapify returns [longitude, latitude] which is correct for GeoJSON
+      newListing.geometry = {
+        type: "Point",
+        coordinates: [
+          data.features[0].properties.lon,
+          data.features[0].properties.lat
+        ]
+      };
+    } else {
+      console.log("No geocoding results found, using default coordinates");
+      newListing.geometry = {
+        type: "Point",
+        coordinates: [0, 0]
+      };
+    }
+  } catch (err) {
+    console.error("Geocoding error (using default coordinates):", err.message);
+    // Use default coordinates if geocoding fails
+    newListing.geometry = {
+      type: "Point",
+      coordinates: [0, 0]
+    };
+  }
 
   newListing.image.url = url;
   newListing.image.filename = filename;
-  let saved = await newListing.save();
-
-  console.log(saved);
-  req.flash("success","New Listing Created!")
-
-  res.redirect("/listings");
+  
+  try {
+    let saved = await newListing.save();
+    console.log("Listing saved successfully:", saved._id);
+    req.flash("success","New Listing Created!")
+    res.redirect("/listings");
+  } catch (err) {
+    console.error("Error saving listing:", err);
+    req.flash("error", "Failed to save listing: " + err.message);
+    res.redirect("/listings/new");
+  }
 
 }
 

@@ -23,17 +23,22 @@ const userRouter = require("./routes/user.js");
 
  const dbUrl = process.env.ATLASDB_URL;
 
+async function main() {
+  await mongoose.connect(dbUrl);
+}
+
 main()
   .then(() => {
     console.log("connected to DB");
   })
   .catch((err) => {
-    console.log(err);
+    console.log("MongoDB connection error:", err.message);
+    console.log("\nPlease check:");
+    console.log("1. Your MongoDB Atlas IP is whitelisted");
+    console.log("2. Your connection string is correct");
+    console.log("3. Your cluster is active and not paused");
+    console.log("\nServer will continue with limited functionality...");
   });
-
-async function main() {
-  await mongoose.connect(dbUrl);
-}
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -42,20 +47,27 @@ app.use(methodOverride("_method"));
 app.engine("ejs", ejsMate);
 app.use(express.static(path.join(__dirname, "/public")));
 
-const store = MongoStore.create({
-  mongoUrl: dbUrl,
-  crypto: {
-    secret: process.env.SECRET,
-  },
-  touchAfter: 24 * 3600,
-});
-
-store.on("error", () => {
-  console.log("Error in Mongo Session Store",err);
-})
+let store;
+try {
+  store = MongoStore.create({
+    mongoUrl: dbUrl,
+    crypto: {
+      secret: process.env.SECRET,
+    },
+    touchAfter: 24 * 3600,
+  });
+  
+  store.on("error", (err) => {
+    console.log("Error in Mongo Session Store", err);
+  });
+  
+  console.log("MongoDB session store created successfully");
+} catch (err) {
+  console.log("Failed to create MongoDB session store, using memory store (sessions will not persist)");
+  console.log("Error:", err.message);
+}
 
 const sessionOption = {
-   store,
   secret: process.env.SECRET,
   resave: false,
   saveUninitialized: true,
@@ -64,6 +76,10 @@ const sessionOption = {
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
   }
+};
+
+if (store) {
+  sessionOption.store = store;
 }
 
 // app.get("/", (req, res) => {
@@ -84,7 +100,7 @@ passport.deserializeUser(User.deserializeUser());
 app.use((req,res,next) => {
   res.locals.success = req.flash("success");
   res.locals.error = req.flash("error");
-  res.locals.currUser = req.user;
+  res.locals.currUser = req.user || null;
   next();
 })
 
